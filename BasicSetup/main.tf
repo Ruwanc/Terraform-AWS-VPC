@@ -16,6 +16,12 @@ resource "aws_subnet" "public-subnet-1" {
   }
 }
 
+# Create Subnet2 - Private Subnet
+resource "aws_subnet" "private_subnet_1" {
+  vpc_id     = aws_vpc.uat-vpc.id
+  cidr_block = "10.1.2.0/24"
+}
+
 # Create Internet Gateway for public subnet
 resource "aws_internet_gateway" "uat-igw" {
   vpc_id = aws_vpc.uat-vpc.id
@@ -36,6 +42,16 @@ resource "aws_route_table" "uat-public-rt" {
   vpc_id = aws_vpc.uat-vpc.id
 
   # since this is exactly the route AWS will create, the route will be adopted
+  route {
+    cidr_block = "10.1.0.0/16" #VPC cider block here
+    gateway_id = "local"
+  }
+}
+
+# Create routing table for private subnet
+resource "aws_route_table" "uat-private-rt" {
+  vpc_id = aws_vpc.uat-vpc.id
+
   route {
     cidr_block = "10.1.0.0/16"
     gateway_id = "local"
@@ -82,4 +98,44 @@ resource "aws_network_acl_rule" "nacl-public-subnet-1-allow-all-egress" {
   #If the value of protocol is -1 or all, the from_port and to_port values will be ignored and the rule will apply to all ports
   #   from_port      = 22
   #   to_port        = 22
+}
+
+# Create NACL rule for private subnet
+resource "aws_network_acl" "nacl_private_subnet_1" {
+  vpc_id = aws_vpc.uat-vpc.id
+}
+
+resource "aws_network_acl_rule" "nacl_private_subnet_1_block_all_ingress" {
+  network_acl_id = aws_network_acl.nacl-public-subnet-1.id
+  rule_number    = 100
+  egress         = false
+  protocol       = "-1"
+  rule_action    = "block"
+  cidr_block     = "0.0.0.0/0"
+  #If the value of protocol is -1 or all, the from_port and to_port values will be ignored and the rule will apply to all ports
+  #   from_port      = 22
+  #   to_port        = 22
+}
+
+resource "aws_network_acl_rule" "nacl_private_subnet_1_block_all_egress" {
+  network_acl_id = aws_network_acl.nacl-public-subnet-1.id
+  rule_number    = 100
+  egress         = true
+  protocol       = "-1"
+  rule_action    = "block"
+  cidr_block     = "0.0.0.0/0"
+  #If the value of protocol is -1 or all, the from_port and to_port values will be ignored and the rule will apply to all ports
+  #   from_port      = 22
+  #   to_port        = 22
+}
+# Associate network ACL with public subnet
+resource "aws_network_acl_association" "nacl-associate-public-subnet-1" {
+  network_acl_id = aws_network_acl.nacl-public-subnet-1.id
+  subnet_id      = aws_subnet.public-subnet-1.id
+}
+
+# Associate network ACL with private subnet
+resource "aws_network_acl_association" "nacl_associate_private_subnet_1" {
+  network_acl_id = aws_network_acl.nacl_private_subnet_1.id
+  subnet_id      = aws_subnet.private_subnet_1.id
 }
